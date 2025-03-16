@@ -8,8 +8,11 @@ from sklearn.ensemble import RandomForestClassifier, VotingClassifier
 
 # ensemble_vote
 # ensemble_stakking
+#ensemble_proba_stakking
+#ensemble_stakking_withtrain
 # baseline_rf
 # baseline_gbm
+# stakking_proba_withtrain
 
 def ensemble_vote(train, test):
     # xyの用意
@@ -70,7 +73,7 @@ def ensemble_stakking(train, test):
     meta_x_train = np.column_stack((train_preds_rf, train_preds_lgbm))
     meta_x_test = np.column_stack((test_preds_rf, test_preds_lgbm))
     # メタモデルの訓練
-    meta_model = xgb.XGBRegressor(n_estimators=100, random_state=42)
+    meta_model = xgb.XGBClassifier(n_estimators=100, random_state=42)
     meta_model.fit(meta_x_train, y_train)
     # メタモデルの予想
     final_preds = meta_model.predict(meta_x_test)
@@ -117,3 +120,124 @@ def baseline_gbm(train, test):
     y_pred_binary = (y_pred >= 0.5).astype(int)
     result_gbm = pd.DataFrame({'PassengerId': test['PassengerId'].values, 'Survived': y_pred_binary})
     return result_gbm
+#  -------------------------------------------------------------
+def ensemble_proba_stakking(train, test):
+     # xyの用意
+    x_train = train.drop(['Survived'], axis=1, inplace=False)
+    y_train = train['Survived']
+    x_test = test.drop(['PassengerId'], axis=1, inplace=False)
+    #パラメーターの用意
+    lgbm_params = {
+            'objective': 'binary',
+            'metric': 'binary_error',
+            'boosting_type': 'gbdt',
+            'num_leaves': 32,
+            'learning_rate': 0.05,
+            'feature_fraction': 0.9,
+            'random_state': 42
+        }
+    num_round = 100
+    # インスタンス化
+    lgbm = lgb.LGBMClassifier(**lgbm_params, n_estimators=num_round)
+    rf = RandomForestClassifier(n_estimators=num_round, random_state=42)
+    # ベースモデル学習
+    rf.fit(x_train, y_train)
+    lgbm.fit(x_train, y_train)
+    # 各Xデータから、予測を出す
+    train_preds_rf = rf.predict_proba(x_train)[:, 1]
+    train_preds_lgbm = lgbm.predict_proba(x_train)[:, 1]
+    test_preds_rf = rf.predict_proba(x_test)[:, 1]
+    test_preds_lgbm = lgbm.predict_proba(x_test)[:, 1]
+    # 予測からメタデータを出す
+    meta_x_train = np.column_stack((train_preds_rf, train_preds_lgbm))
+    meta_x_test = np.column_stack((test_preds_rf, test_preds_lgbm))
+    # メタモデルの訓練
+    meta_model = xgb.XGBClassifier(n_estimators=100, random_state=42)
+    meta_model.fit(meta_x_train, y_train)
+    # メタモデルの予想
+    final_preds = meta_model.predict(meta_x_test)
+    final_preds_binary = (final_preds >= 0.5).astype(int)
+    result = pd.DataFrame({'PassengerId': test['PassengerId'].values, 'Survived': final_preds_binary})
+    return result
+
+# ==========================================================================
+
+def ensemble_stakking_withtrain(train, test):
+     # xyの用意
+    x_train = train.drop(['Survived'], axis=1, inplace=False)
+    y_train = train['Survived']
+    x_test = test.drop(['PassengerId'], axis=1, inplace=False)
+    #パラメーターの用意
+    lgbm_params = {
+            'objective': 'binary',
+            'metric': 'binary_error',
+            'boosting_type': 'gbdt',
+            'num_leaves': 32,
+            'learning_rate': 0.05,
+            'feature_fraction': 0.9,
+            'random_state': 42
+        }
+    num_round = 100
+    # インスタンス化
+    lgbm = lgb.LGBMClassifier(**lgbm_params, n_estimators=num_round)
+    rf = RandomForestClassifier(n_estimators=num_round, random_state=42)
+    # ベースモデル学習
+    rf.fit(x_train, y_train)
+    lgbm.fit(x_train, y_train)
+    # 各Xデータから、予測を出す
+    train_preds_rf = rf.predict(x_train)
+    train_preds_lgbm = lgbm.predict(x_train)
+    test_preds_rf = rf.predict(x_test)
+    test_preds_lgbm = lgbm.predict(x_test)
+    # 予測からメタデータを出す
+    meta_x_train = np.column_stack((train_preds_rf, train_preds_lgbm, x_train))
+    meta_x_test = np.column_stack((test_preds_rf, test_preds_lgbm, x_test))
+    # メタモデルの訓練
+    meta_model = xgb.XGBClassifier(n_estimators=100, random_state=42)
+    meta_model.fit(meta_x_train, y_train)
+    # メタモデルの予想
+    final_preds = meta_model.predict(meta_x_test)
+    final_preds_binary = (final_preds >= 0.5).astype(int)
+    result = pd.DataFrame({'PassengerId': test['PassengerId'].values, 'Survived': final_preds_binary})
+    return result
+
+# =============================================================================================
+
+def stakking_proba_withtrain(train, test):
+     # xyの用意
+    x_train = train.drop(['Survived'], axis=1, inplace=False)
+    y_train = train['Survived']
+    x_test = test.drop(['PassengerId'], axis=1, inplace=False)
+    #パラメーターの用意
+    lgbm_params = {
+            'objective': 'binary',
+            'metric': 'binary_error',
+            'boosting_type': 'gbdt',
+            'num_leaves': 32,
+            'learning_rate': 0.05,
+            'feature_fraction': 0.9,
+            'random_state': 42
+        }
+    num_round = 100
+    # インスタンス化
+    lgbm = lgb.LGBMClassifier(**lgbm_params, n_estimators=num_round)
+    rf = RandomForestClassifier(n_estimators=num_round, random_state=42)
+    # ベースモデル学習
+    rf.fit(x_train, y_train)
+    lgbm.fit(x_train, y_train)
+    # 各Xデータから、予測を出す
+    train_preds_rf = rf.predict_proba(x_train)[:, 1]
+    train_preds_lgbm = lgbm.predict_proba(x_train)[:, 1]
+    test_preds_rf = rf.predict_proba(x_test)[:, 1]
+    test_preds_lgbm = lgbm.predict_proba(x_test)[:, 1]
+    # 予測からメタデータを出す
+    meta_x_train = np.column_stack((train_preds_rf, train_preds_lgbm, x_train))
+    meta_x_test = np.column_stack((test_preds_rf, test_preds_lgbm, x_test))
+    # メタモデルの訓練
+    meta_model = xgb.XGBClassifier(n_estimators=100, random_state=42)
+    meta_model.fit(meta_x_train, y_train)
+    # メタモデルの予想
+    final_preds = meta_model.predict(meta_x_test)
+    final_preds_binary = (final_preds >= 0.5).astype(int)
+    result = pd.DataFrame({'PassengerId': test['PassengerId'].values, 'Survived': final_preds_binary})
+    return result
