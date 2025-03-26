@@ -3,16 +3,22 @@ import pandas as pd
 import lightgbm as lgb
 import xgboost as xgb
 from sklearn.ensemble import RandomForestClassifier, VotingClassifier
+from sklearn.model_selection import StratifiedKFold
+from sklearn.metrics import accuracy_score
 
 # 収録している関数
 
 # ensemble_vote
 # ensemble_stakking
-#ensemble_proba_stakking
-#ensemble_stakking_withtrain
 # baseline_rf
 # baseline_gbm
+
 # stakking_proba_withtrain
+#ensemble_proba_stakking
+#ensemble_stakking_withtrain
+
+# k_gbm
+# k_vote
 
 def ensemble_vote(train, test):
     # xyの用意
@@ -241,3 +247,103 @@ def stakking_proba_withtrain(train, test):
     final_preds_binary = (final_preds >= 0.5).astype(int)
     result = pd.DataFrame({'PassengerId': test['PassengerId'].values, 'Survived': final_preds_binary})
     return result
+
+
+# =========================================================================================
+
+def k_vote(input_train, input_test, lgbm_params, num_round=100, n_splits=5):
+
+    X = input_train.drop(['Survived'], axis=1, inplace=False)
+    y = input_train['Survived']
+    x_test = input_test.drop(['PassengerId'], axis=1, inplace=False)
+
+    scores = []
+
+    kf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+    test_preds = np.zeros(len(input_test))
+
+    for fold, (train_idx, val_idx) in enumerate(kf.split(X, y)):
+        
+        print(f"Fold {fold+1}/{n_splits}")
+        
+        x_train, x_val = X.iloc[train_idx], X.iloc[val_idx]
+        y_train, y_val = y.iloc[train_idx], y.iloc[val_idx] 
+        
+        lgbm = lgb.LGBMClassifier(**lgbm_params, n_estimators=num_round)
+        rf = RandomForestClassifier(n_estimators=num_round, random_state=42)
+        ensemble = VotingClassifier(estimators=[('rf', rf), ('lgbm', lgbm)], voting='soft')
+        
+        ensemble.fit(x_train, y_train)
+        
+        y_pred = ensemble.predict_proba(x_val)
+        y_pred_binary = (y_pred[:, 1] > 0.5).astype(int)
+
+        acc = accuracy_score(y_val, y_pred_binary)
+        print(f"Fold {fold+1} Accuracy: {acc:.4f}")
+        scores.append(acc)
+
+        test_preds += ensemble.predict_proba(x_test)[:, 1] / n_splits
+
+    print(f"Mean Accuracy: {np.mean(scores):.4f}")
+
+    test_preds_binary = (test_preds >= 0.5).astype(int)
+    result = pd.DataFrame({'PassengerId': input_test['PassengerId'], 'Survived': test_preds_binary})
+    
+    return result
+
+# ===========================================================================
+
+
+def k_gbm(input_train, input_test, lgbm_params, n_splits=5):
+    X = input_train.drop(['Survived'], axis=1, inplace=False)
+    y = input_train['Survived']
+    x_test = input_test.drop(['PassengerId'], axis=1, inplace=False)
+
+    kf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+    
+    models = []
+    scores = []
+    test_preds = np.zeros(len(input_test))
+
+    for fold, (train_idx, val_idx) in enumerate(kf.split(X, y)):
+        
+        print(f"Fold {fold+1}/{n_splits}")
+        
+        x_train, x_val = X.iloc[train_idx], X.iloc[val_idx]
+        y_train, y_val = y.iloc[train_idx], y.iloc[val_idx] 
+        
+        train_data = lgb.Dataset(x_train, label=y_train)
+        val_data = lgb.Dataset(x_val, label=y_val)
+        
+        
+        model = lgb.train(
+            lgbm_params,
+            train_data,
+            valid_sets=[val_data],
+            callbacks=[lgb.early_stopping(stopping_rounds=10),
+                       lgb.log_evaluation(10)
+                       ]
+            
+            )
+       
+    
+        # 予測
+        y_pred = model.predict(x_val)
+        y_pred_binary = (y_pred > 0.5).astype(int)
+
+        # 精度計算
+        acc = accuracy_score(y_val, y_pred_binary)
+        print(f"Fold {fold+1} Accuracy: {acc:.4f}")
+
+        # モデルとスコアを保存
+        models.append(model)
+        scores.append(acc)
+        test_preds += model.predict(x_test) / n_splits 
+
+    # 平均スコアを表示
+    print(f"Mean Accuracy: {np.mean(scores):.4f}")
+    y_preds_binary = (test_preds > 0.5).astype(int)
+    result_gbm = pd.DataFrame({'PassengerId': input_test['PassengerId'].values, 'Survived': y_preds_binary})
+    return result_gbm
+
+
