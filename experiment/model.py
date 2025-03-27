@@ -344,6 +344,6 @@ def k_gbm(input_train, input_test, lgbm_params, n_splits=5):
     print(f"Mean Accuracy: {np.mean(scores):.4f}")
     y_preds_binary = (test_preds > 0.5).astype(int)
     result_gbm = pd.DataFrame({'PassengerId': input_test['PassengerId'].values, 'Survived': y_preds_binary})
-    return result_gbm
+    return result_gbm, models, scores
 
 
