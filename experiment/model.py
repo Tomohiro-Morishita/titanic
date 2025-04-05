@@ -105,6 +105,7 @@ def baseline_rf(train, test):
 # ---------------------------------------------------------------------
 
 def baseline_gbm(train, test):
+    
     x_train = train.drop(['Survived'], axis=1, inplace=False)
     y_train = train['Survived']
     x_test = test.drop(['PassengerId'], axis=1, inplace=False)
@@ -127,6 +128,7 @@ def baseline_gbm(train, test):
     result_gbm = pd.DataFrame({'PassengerId': test['PassengerId'].values, 'Survived': y_pred_binary})
     return result_gbm
 #  -------------------------------------------------------------
+
 def ensemble_proba_stakking(train, test):
      # xyの用意
     x_train = train.drop(['Survived'], axis=1, inplace=False)
